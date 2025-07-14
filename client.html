@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>WebSocket Chat</title>
+  <!-- CSS dosyasını bağla -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>Go WebSocket Chat</h2>
+
+  <input id="username" placeholder="Kullanıcı adınız"><br>
+  <input id="message" placeholder="Mesajınız">
+  <button onclick="sendMessage()">Gönder</button>
+
+  <ul id="chat"></ul>
+
+  <script>
+    // WebSocket bağlantısı
+    const socket = new WebSocket("ws://localhost:8080/ws");
+
+    // Gelen mesajları al ve ekrana yaz
+    socket.onmessage = function(event) {
+      const li = document.createElement("li");
+      li.innerText = event.data;
+      document.getElementById("chat").appendChild(li);
+    };
+
+    // Gönderme işlemi
+    function sendMessage() {
+      const user = document.getElementById("username").value;
+      const msg = document.getElementById("message").value;
+      if (user && msg) {
+        socket.send(user + ": " + msg);
+        document.getElementById("message").value = "";
+      }
+    }
+  </script>
+</body>
+</html>
