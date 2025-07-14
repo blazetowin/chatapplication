@@ -2,86 +2,81 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>WebSocket Chat</title>
+  <title>Go WebSocket Chat</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h2>Go WebSocket Chat</h2>
 
-  <!-- Kullanıcı adı girişi -->
   <input id="username" placeholder="Kullanıcı adınız" /><br><br>
 
-  <!-- Mesaj kutusu -->
-  <input id="message" placeholder="Mesajınız" />
+  <input id="message" placeholder="Mesajınız (örn: :smile:)" />
   <button onclick="sendMessage()">Gönder</button>
 
-  <!-- Sohbet geçmişi buraya yazılacak -->
-  <ul id="chat"></ul>
+  <div class="chat-area">
+    <ul id="chat"></ul>
+  </div>
 
   <script>
-  let socket; // global değişken olarak tanımlıyoruz
+    let socket;
 
-  // Gönderme fonksiyonu (ilk tıklamada bağlantıyı kurar)
-  function sendMessage() {
-    const username = document.getElementById("username").value.trim();
-    const msg = document.getElementById("message").value.trim();
+    function sendMessage() {
+      const username = document.getElementById("username").value.trim();
+      const msg = document.getElementById("message").value.trim();
 
-    if (!username) {
-      alert("Lütfen bir kullanıcı adı girin.");
-      return;
-    }
+      if (!username) {
+        alert("Lütfen kullanıcı adınızı girin.");
+        return;
+      }
 
-    // Eğer bağlantı yoksa ya da kapalıysa, bağlantıyı başlat
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      socket = new WebSocket("ws://localhost:8080/ws");
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        socket = new WebSocket("ws://localhost:8080/ws");
 
-      // Bağlantı açıldığında ilk olarak kullanıcı adını gönder
-      socket.onopen = function () {
-        socket.send(username);
+        socket.onopen = function () {
+          socket.send(username);
+          if (msg) {
+            socket.send(msg);
+            document.getElementById("message").value = "";
+          }
+        };
+
+        socket.onmessage = function (event) {
+          const li = document.createElement("li");
+          const msg = event.data;
+
+          if (msg.includes("katıldı")) {
+            li.style.color = "blue";
+            li.style.fontWeight = "bold";
+          } else if (msg.includes("ayrıldı")) {
+            li.style.color = "red";
+            li.style.fontWeight = "bold";
+          } else if (msg.startsWith("👥")) {
+            li.style.color = "green";
+            li.style.fontStyle = "italic";
+          }
+
+          li.textContent = msg;
+          document.getElementById("chat").appendChild(li);
+        };
+
+        socket.onerror = function (error) {
+          alert("Bağlantı hatası: " + error.message);
+        };
+
+        socket.onclose = function () {
+          console.log("Bağlantı kapatıldı.");
+        };
+      } else {
         if (msg) {
           socket.send(msg);
           document.getElementById("message").value = "";
         }
-      };
-
-      // Gelen mesajları işle
-      socket.onmessage = function (event) {
-        const chatBox = document.getElementById("chat");
-        const li = document.createElement("li");
-        const incomingMsg = event.data;
-
-        if (incomingMsg.includes("katıldı")) {
-          li.style.color = "blue";
-          li.style.fontWeight = "bold";
-        } else if (incomingMsg.includes("ayrıldı")) {
-          li.style.color = "red";
-          li.style.fontWeight = "bold";
-        }
-        li.textContent = incomingMsg;
-        chatBox.appendChild(li);
-      };
-
-      socket.onerror = function (error) {
-        alert("Bağlantı hatası: " + error.message);
-      };
-
-      socket.onclose = function () {
-        console.log("Bağlantı kapatıldı.");
-      };
-    } else {
-      // Bağlantı zaten varsa, sadece mesajı gönder
-      if (msg) {
-        socket.send(msg);
-        document.getElementById("message").value = "";
       }
     }
-  }
 
-  // Enter tuşuna basıldığında da gönderme çalışsın
-  document.getElementById("message").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") sendMessage();
-  });
-</script>
-
+    document.getElementById("message").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") sendMessage();
+    });
+  </script>
 </body>
 </html>

@@ -1,56 +1,25 @@
-/* Tüm sayfa arka planı ve yazı tipi */
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    padding: 30px;
-    color: #333;
+  font-family: Arial, sans-serif;
+  background: #f7f7f7;
+  padding: 20px;
 }
 
-/* Başlık */
-h2 {
-    color: #2c3e50;
+input, button {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 4px;
 }
 
-/* Giriş kutuları */
-input {
-    padding: 10px;
-    margin: 5px 0;
-    width: 250px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+.chat-area {
+  margin-top: 20px;
+  background: white;
+  border: 1px solid #ccc;
+  height: 300px;
+  overflow-y: scroll;
+  padding: 10px;
 }
 
-/* Gönder butonu */
-button {
-    padding: 10px 15px;
-    background-color: #3498db;
-    border: none;
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-button:hover {
-    background-color: #2980b9;
-}
-
-/* Sohbet kutusu (liste) */
-#chat {
-    margin-top: 20px;
-    list-style-type: none;
-    padding: 0;
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 5px;
-}
-
-#chat li {
-    padding: 8px 10px;
-    border-bottom: 1px solid #eee;
-}
-
-#chat li:last-child {
-    border-bottom: none;
+ul {
+  list-style-type: none;
+  padding-left: 0;
 }
