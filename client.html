@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>WebSocket Chat</title>
-  <!-- CSS dosyasını bağla -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,52 +19,69 @@
   <ul id="chat"></ul>
 
   <script>
-    // WebSocket bağlantısı oluşturulur
-    const socket = new WebSocket("ws://localhost:8080/ws");
+  let socket; // global değişken olarak tanımlıyoruz
 
-    // WebSocket sunucusundan gelen her mesajda çalışır
-    socket.onmessage = function(event) {
-      const li = document.createElement("li");
-      li.textContent = event.data;
-      document.getElementById("chat").appendChild(li);
-    };
+  // Gönderme fonksiyonu (ilk tıklamada bağlantıyı kurar)
+  function sendMessage() {
+    const username = document.getElementById("username").value.trim();
+    const msg = document.getElementById("message").value.trim();
 
-    // Hata durumunu kullanıcıya bildir
-    socket.onerror = function(error) {
-      alert("Sunucu bağlantı hatası: " + error.message);
-    };
-
-    // WebSocket kapandığında uyarı ver
-    socket.onclose = function() {
-      alert("Bağlantı kapatıldı.");
-    };
-
-    // Mesaj gönderme işlemi
-    function sendMessage() {
-      const user = document.getElementById("username").value.trim();
-      const msg = document.getElementById("message").value.trim();
-
-      if (!user) {
-        alert("Lütfen bir kullanıcı adı girin.");
-        return;
-      }
-      if (!msg) {
-        return; // boş mesaj göndermeyelim
-      }
-
-      const fullMessage = `${user}: ${msg}`;
-      socket.send(fullMessage);
-
-      // Mesaj kutusunu temizle
-      document.getElementById("message").value = "";
+    if (!username) {
+      alert("Lütfen bir kullanıcı adı girin.");
+      return;
     }
 
-    // Klavyeden Enter tuşuna basıldığında mesaj gönder
-    document.getElementById("message").addEventListener("keydown", function(e) {
-      if (e.key === "Enter") {
-        sendMessage();
+    // Eğer bağlantı yoksa ya da kapalıysa, bağlantıyı başlat
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      socket = new WebSocket("ws://localhost:8080/ws");
+
+      // Bağlantı açıldığında ilk olarak kullanıcı adını gönder
+      socket.onopen = function () {
+        socket.send(username);
+        if (msg) {
+          socket.send(msg);
+          document.getElementById("message").value = "";
+        }
+      };
+
+      // Gelen mesajları işle
+      socket.onmessage = function (event) {
+        const chatBox = document.getElementById("chat");
+        const li = document.createElement("li");
+        const incomingMsg = event.data;
+
+        if (incomingMsg.includes("katıldı")) {
+          li.style.color = "blue";
+          li.style.fontWeight = "bold";
+        } else if (incomingMsg.includes("ayrıldı")) {
+          li.style.color = "red";
+          li.style.fontWeight = "bold";
+        }
+        li.textContent = incomingMsg;
+        chatBox.appendChild(li);
+      };
+
+      socket.onerror = function (error) {
+        alert("Bağlantı hatası: " + error.message);
+      };
+
+      socket.onclose = function () {
+        console.log("Bağlantı kapatıldı.");
+      };
+    } else {
+      // Bağlantı zaten varsa, sadece mesajı gönder
+      if (msg) {
+        socket.send(msg);
+        document.getElementById("message").value = "";
       }
-    });
-  </script>
+    }
+  }
+
+  // Enter tuşuna basıldığında da gönderme çalışsın
+  document.getElementById("message").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") sendMessage();
+  });
+</script>
+
 </body>
 </html>
