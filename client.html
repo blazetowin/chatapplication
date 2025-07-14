@@ -9,32 +9,63 @@
 <body>
   <h2>Go WebSocket Chat</h2>
 
-  <input id="username" placeholder="Kullanıcı adınız"><br>
-  <input id="message" placeholder="Mesajınız">
+  <!-- Kullanıcı adı girişi -->
+  <input id="username" placeholder="Kullanıcı adınız" /><br><br>
+
+  <!-- Mesaj kutusu -->
+  <input id="message" placeholder="Mesajınız" />
   <button onclick="sendMessage()">Gönder</button>
 
+  <!-- Sohbet geçmişi buraya yazılacak -->
   <ul id="chat"></ul>
 
   <script>
-    // WebSocket bağlantısı
+    // WebSocket bağlantısı oluşturulur
     const socket = new WebSocket("ws://localhost:8080/ws");
 
-    // Gelen mesajları al ve ekrana yaz
+    // WebSocket sunucusundan gelen her mesajda çalışır
     socket.onmessage = function(event) {
       const li = document.createElement("li");
-      li.innerText = event.data;
+      li.textContent = event.data;
       document.getElementById("chat").appendChild(li);
     };
 
-    // Gönderme işlemi
+    // Hata durumunu kullanıcıya bildir
+    socket.onerror = function(error) {
+      alert("Sunucu bağlantı hatası: " + error.message);
+    };
+
+    // WebSocket kapandığında uyarı ver
+    socket.onclose = function() {
+      alert("Bağlantı kapatıldı.");
+    };
+
+    // Mesaj gönderme işlemi
     function sendMessage() {
-      const user = document.getElementById("username").value;
-      const msg = document.getElementById("message").value;
-      if (user && msg) {
-        socket.send(user + ": " + msg);
-        document.getElementById("message").value = "";
+      const user = document.getElementById("username").value.trim();
+      const msg = document.getElementById("message").value.trim();
+
+      if (!user) {
+        alert("Lütfen bir kullanıcı adı girin.");
+        return;
       }
+      if (!msg) {
+        return; // boş mesaj göndermeyelim
+      }
+
+      const fullMessage = `${user}: ${msg}`;
+      socket.send(fullMessage);
+
+      // Mesaj kutusunu temizle
+      document.getElementById("message").value = "";
     }
+
+    // Klavyeden Enter tuşuna basıldığında mesaj gönder
+    document.getElementById("message").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        sendMessage();
+      }
+    });
   </script>
 </body>
 </html>
