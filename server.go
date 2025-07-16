@@ -8,6 +8,8 @@ import (
 	"sync" // sync paketi, eşzamanlı programlama için kullanılır
 
 	"github.com/gorilla/websocket" // gorilla/websocket paketi, WebSocket bağlantıları için kullanılır
+	"database/sql" // sql paketi, SQLite veritabanı işlemleri için kullanılır
+	_ "github.com/mattn/go-sqlite3" // SQLite sürücüsü, blank import ile kaydedilir
 )
 
 // WebSocket bağlantısını HTTP üzerinden yükseltmek için 
@@ -25,6 +27,9 @@ var clientsMutex = sync.Mutex{}
 // Gelen mesajlar burada toplanır
 // broadcast kanalı, tüm istemcilere mesaj göndermek için kullanılır
 var broadcast = make(chan string)
+
+// db değişkeni, SQLite veritabanı bağlantısını temsil eder
+var db *sql.DB
  
 // main fonksiyonu, WebSocket sunucusunu başlatır
 // HTTP sunucusu "/ws" yolunda WebSocket bağlantılarını dinler
@@ -36,6 +41,24 @@ var broadcast = make(chan string)
 // Program, "WebSocket sunucusu http://localhost:8080/ws adresinde çalışıyor..." mesajını yazdırır
 // HTTP sunucusunu dinlemeye başlar
 func main() {
+	var err error
+	// SQLite veritabanı bağlantısı açılır (chat.db dosyası)
+	db, err = sql.Open("sqlite3", "./chat.db")
+	if err != nil {
+		log.Fatal("Veritabanı açma hatası:", err)
+	}
+	defer db.Close()
+
+	// Mesajlar tablosu yoksa oluşturulur
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS messages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT,
+		message TEXT
+	)`)
+	if err != nil {
+		log.Fatal("Tablo oluşturma hatası:", err)
+	}
+
 	// WebSocket bağlantılarını dinler
 	http.HandleFunc("/ws", handleConnections)
 	http.Handle("/", http.FileServer(http.Dir("./")))
@@ -110,6 +133,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Aktif kullanıcı listesini gönder
 	sendActiveUsers()
 
+
 	for {
 		// Kullanıcıdan gelen mesajları dinler
 		// Eğer hata oluşursa, kullanıcı ayrıldı mesajı yazdırılır
@@ -120,6 +144,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
 			log.Printf("Kullanıcı ayrıldı: %s\n", username)
+			log.Println("Hata:", err)
 
 			clientsMutex.Lock()
 			delete(clients, ws)
@@ -138,11 +163,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleMessages() {
-
 	for {
 		// broadcast kanalından gelen mesajları dinler
 		// clients haritasındaki tüm WebSocket bağlantılarına mesajı gönderir		
 		msg := <-broadcast
+
+		// Mesaj veritabanına kaydedilir
+		saveMessageToDB(msg)
+
 		clientsMutex.Lock()
 		for client := range clients {
 			err := client.WriteMessage(websocket.TextMessage, []byte(msg))
@@ -185,4 +213,22 @@ func emojiParser(text string) string {
 		text = strings.ReplaceAll(text, key, val)
 	}
 	return text
+}
+
+// saveMessageToDB fonksiyonu, gelen mesajı SQLite veritabanına kaydeder
+func saveMessageToDB(msg string) {
+	username := "Sistem"
+	message := msg
+
+	// Kullanıcı adı mesajdan ayrıştırılır
+	if strings.Contains(msg, ": ") {
+		parts := strings.SplitN(msg, ": ", 2)
+		username = parts[0]
+		message = parts[1]
+	}
+
+	_, err := db.Exec("INSERT INTO messages(username, message) VALUES(?, ?)", username, message)
+	if err != nil {
+		log.Println("Mesaj veritabanına kaydedilemedi:", err)
+	}
 }
