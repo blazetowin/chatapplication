@@ -12,92 +12,111 @@
   <input id="username" placeholder="Kullanıcı adınız" /><br><br>
   <p>Mesaj göndermek için kullanıcı adınızı girin ve mesajınızı yazın. Mesajlarınızda emojiler kullanabilirsiniz (örn: :smile:).</p>
   <input id="message" placeholder="Mesajınız (örn: :smile:)">
-
   <button onclick="sendMessage(event)">Gönder</button>
-  
+
   <div class="chat-area">
     <ul id="chat"></ul>
   </div>
-<script>
-let socket;
-let username = "";
-let isConnected = false;
 
-function openSocket() {
-  console.log("Yeni WebSocket açılıyor...");
-  socket = new WebSocket("ws://localhost:8080/ws");
+  <!-- ✅ Sağ üstte aktif kullanıcı listesi -->
+  <div style="position:absolute; top:10px; right:10px; background:#f9f9f9; padding:10px; border:1px solid #ccc;">
+    <strong>Aktif Kullanıcılar</strong>
+    <ul id="active-users"></ul>
+  </div>
 
-  socket.onopen = function () {
-    console.log("Bağlantı açıldı, kullanıcı adı gönderiliyor:", username);
-    socket.send(username);
-    isConnected = true;
-  };
+  <script>
+    let socket;
 
-  socket.onmessage = function (event) {
-    console.log("Gelen mesaj:", event.data);
-    const chatList = document.getElementById("chat");
-    if (!chatList) return;
-    const li = document.createElement("li");
-    li.textContent = event.data;
-    chatList.appendChild(li);
-  };
+    function openSocket(username) {
+      console.log("Yeni WebSocket açılıyor...");
+      socket = new WebSocket("ws://localhost:8080/ws");
 
-  socket.onerror = function (error) {
-    console.error("Socket hatası:", error);
-  };
+      socket.onopen = function () {
+        console.log("WebSocket açık, kullanıcı adı gönderiliyor:", username);
+        socket.send(username);
+      };
 
-  socket.onclose = function (event) {
-    console.log("Bağlantı kapatıldı. Kodu:", event.code);
-    isConnected = false;
-  };
-}
+      socket.onmessage = function (event) {
+        console.log("Gelen mesaj:", event.data);
 
-function sendMessage(e) {
-  if (e) e.preventDefault();
+        // JSON ise aktif kullanıcı listesi
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.type === "active_users") {
+            const list = document.getElementById("active-users");
+            list.innerHTML = "";
+            parsed.users.forEach(user => {
+              const li = document.createElement("li");
+              li.textContent = user;
+              list.appendChild(li);
+            });
+            return;
+          }
+        } catch (err) {
+          // Normal mesaj olarak işlemeye devam et
+        }
 
-  if (!username) {
-    username = document.getElementById("username").value.trim();
-  }
-  const msg = document.getElementById("message").value.trim();
+        const chatList = document.getElementById("chat");
+        if (!chatList) return;
+        const li = document.createElement("li");
+        li.textContent = event.data;
+        chatList.appendChild(li);
+      };
 
-  if (!username) {
-    alert("Kullanıcı adı gir!");
-    return;
-  }
-  if (!isConnected) {
-    openSocket();
-    console.log("Bağlantı açıldı, ilk mesaj bekleniyor...");
-    // ilk mesajı onopen içinde yolla
-    socket.onopen = function () {
-      socket.send(username);
-      if (msg) {
+      socket.onerror = function (error) {
+        console.log("Socket hatası:", error);
+      };
+
+      socket.onclose = function (event) {
+        console.log("Bağlantı kapatıldı. Kodu:", event.code);
+      };
+    }
+
+    function sendMessage(e) {
+      if (e) e.preventDefault();
+
+      const username = document.getElementById("username").value.trim();
+      const msg = document.getElementById("message").value.trim();
+
+      if (!username) {
+        alert("Lütfen kullanıcı adınızı girin.");
+        return;
+      }
+
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        openSocket(username);
+        console.log("Bağlantı yoktu, açıldı.");
+        setTimeout(() => {
+          if (msg) {
+            socket.send(msg);
+            document.getElementById("message").value = "";
+          }
+        }, 200);
+        return;
+      }
+
+      if (!msg) {
+        console.log("Mesaj yok.");
+        return;
+      }
+
+      if (socket.readyState === WebSocket.OPEN) {
         socket.send(msg);
         document.getElementById("message").value = "";
+      } else {
+        console.log("Socket henüz açık değil. Kısa süre bekleniyor...");
+        setTimeout(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(msg);
+            document.getElementById("message").value = "";
+          }
+        }, 200);
       }
-      isConnected = true;
-    };
-    return;
-  }
+    }
 
-  if (!msg) {
-    console.log("Mesaj yok.");
-    return;
-  }
-
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(msg);
-    document.getElementById("message").value = "";
-  } else {
-    console.log("Socket kapalı, mesaj gidemez.");
-  }
-}
-
-document.getElementById("message").addEventListener("keydown", function (e) {
-  if (e.key === "Enter") sendMessage(e);
-});
-
-</script>
-
-
+    document.getElementById("message").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") sendMessage(e);
+    });
+  </script>
 </body>
 </html>
