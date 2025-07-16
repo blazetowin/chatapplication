@@ -1,122 +1,181 @@
 <!DOCTYPE html>
+<!-- Bu satır, bu dosyanın bir HTML5 belgesi olduğunu tarayıcıya söyler. Temel başlık! -->
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
+  <!-- Karakter setini UTF-8 olarak ayarlıyoruz, Türkçe karakterler düzgün gözüksün diye. -->
   <title>Go WebSocket Chat</title>
+  <!-- Sayfa başlığı. Tarayıcı sekmesinde bu görünür. -->
   <link rel="stylesheet" href="style.css">
+  <!-- Harici CSS dosyasını projeye bağlıyoruz. Tasarım buradan gelir. -->
 </head>
 <body>
 
   <h2>Go WebSocket Chat</h2>
-  <p>WebSocket ile gerçek zamanlı sohbet uygulaması</p>
-  <input id="username" placeholder="Kullanıcı adınız" /><br><br>
-  <p>Mesaj göndermek için kullanıcı adınızı girin ve mesajınızı yazın. Mesajlarınızda emojiler kullanabilirsiniz (örn: :smile:).</p>
-  <input id="message" placeholder="Mesajınız (örn: :smile:)">
-  <button onclick="sendMessage(event)">Gönder</button>
+  <!-- Sayfanın ana başlığı. Kullanıcıya uygulamanın adını gösteriyor. -->
 
-  <div class="chat-area">
-    <ul id="chat"></ul>
+  <div id="login-form">
+    <!-- Giriş formunu saran div. Başlangıçta sadece bu görünür. -->
+    <h3>Giriş Yap</h3>
+    <!-- Giriş formu alt başlığı. -->
+    <input id="login-username" placeholder="Kullanıcı Adı"><br><br>
+    <!-- Kullanıcı adı girişi için input. -->
+    <input id="login-password" type="password" placeholder="Şifre"><br><br>
+    <!-- Şifre girişi için input. Karakterler gizlenir. -->
+    <button onclick="loginUser()">Giriş Yap</button>
+    <!-- Giriş yap butonu. Tıklandığında loginUser() fonksiyonu çağrılır. -->
+    <p>Hesabın yok mu? <a href="register.html">Hemen Kayıt Ol</a></p>
+    <!-- Henüz hesabı olmayanlara kayıt olma linki. -->
   </div>
 
-  <!-- ✅ Sağ üstte aktif kullanıcı listesi -->
-  <div style="position:absolute; top:10px; right:10px; background:#f9f9f9; padding:10px; border:1px solid #ccc;">
-    <strong>Aktif Kullanıcılar</strong>
-    <ul id="active-users"></ul>
+  <div id="chat-area" style="display:none;">
+    <!-- Sohbet alanını saran div. Başlangıçta gizli. Giriş başarılı olunca görünür. -->
+    <p>WebSocket ile gerçek zamanlı sohbet</p>
+    <!-- Kullanıcıya ne yaptığını hatırlatan açıklama. -->
+    <input id="username" readonly><br><br>
+    <!-- Giriş yapan kullanıcı adını burada gösteriyoruz. Düzenlenemez (readonly). -->
+    <input id="message" placeholder="Mesajınız (örn: :smile:)">
+    <!-- Mesaj yazma inputu. -->
+    <button onclick="sendMessage(event)">Gönder</button>
+    <!-- Mesaj gönder butonu. sendMessage() fonksiyonu çalışır. -->
+    <ul id="chat"></ul>
+    <!-- Gönderilen tüm mesajlar buraya liste olarak eklenir. -->
+
+    <div style="position:absolute; top:10px; right:10px; background:#f9f9f9; padding:10px;">
+      <!-- Aktif kullanıcılar kutusu, sayfanın sağ üstünde sabit durur. -->
+      <strong>Aktif Kullanıcılar</strong>
+      <!-- Başlık -->
+      <ul id="active-users"></ul>
+      <!-- Aktif kullanıcı listesi buraya gelir. -->
+    </div>
   </div>
 
   <script>
+    // Tüm JS kodları burada.
+
     let socket;
+    // WebSocket bağlantısını temsil edecek değişken. Bağlantıyı burada saklıyoruz.
 
-    function openSocket(username) {
-      console.log("Yeni WebSocket açılıyor...");
+    function loginUser() {
+      // Kullanıcı giriş yapmak istediğinde çalışacak fonksiyon.
+
+      const username = document.getElementById("login-username").value.trim();
+      // Kullanıcı adını inputtan alıp baştaki/sondaki boşlukları kırpıyoruz.
+
+      const password = document.getElementById("login-password").value.trim();
+      // Şifreyi inputtan alıyoruz.
+
+      if (!username || !password) {
+        // Kullanıcı adı veya şifre boşsa uyarı ver.
+        alert("Lütfen kullanıcı adı ve şifre girin.");
+        return;
+      }
+
+      // Sunucuya giriş isteği gönderiyoruz.
+      fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        // Veriyi URL formatında yolluyoruz.
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+        // Kullanıcı adı ve şifreyi düzgünce encode edip yolluyoruz.
+      })
+      .then(response => response.json())
+      // Sunucudan JSON formatında cevap bekliyoruz.
+      .then(data => {
+        if (data.token) {
+          // Eğer giriş başarılıysa token gelir.
+          localStorage.setItem("token", data.token);
+          // Token'ı tarayıcıda localStorage'a kaydet.
+          document.getElementById("login-form").style.display = "none";
+          // Giriş formunu gizle.
+          document.getElementById("chat-area").style.display = "block";
+          // Sohbet alanını göster.
+          document.getElementById("username").value = username;
+          // Kullanıcı adını sohbet alanına yaz.
+          openSocket();
+          // WebSocket bağlantısını başlat.
+        } else {
+          alert("Giriş başarısız!");
+          // Token yoksa giriş başarısız demektir.
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        // Hata olursa konsola yaz.
+        alert("Sunucu hatası!");
+        // Kullanıcıyı bilgilendir.
+      });
+    }
+
+    function openSocket() {
+      // WebSocket bağlantısını açan fonksiyon.
       socket = new WebSocket("ws://localhost:8080/ws");
+      // WebSocket bağlantısını belirlenen URL'ye yapıyoruz.
 
-      socket.onopen = function () {
-        console.log("WebSocket açık, kullanıcı adı gönderiliyor:", username);
-        socket.send(username);
+      socket.onopen = () => {
+        // Bağlantı açıldığında çalışır.
+        const token = localStorage.getItem("token");
+        // Token'ı localStorage'dan al.
+        socket.send(token);
+        // Sunucuya token'ı gönder (kimlik doğrulama için).
       };
 
-      socket.onmessage = function (event) {
-        console.log("Gelen mesaj:", event.data);
-
-        // JSON ise aktif kullanıcı listesi
+      socket.onmessage = (event) => {
+        // Sunucudan yeni mesaj gelince çalışır.
         try {
           const parsed = JSON.parse(event.data);
+          // Gelen veriyi JSON olarak parse etmeyi dene.
+
           if (parsed.type === "active_users") {
+            // Gelen veri aktif kullanıcı listesi ise:
             const list = document.getElementById("active-users");
             list.innerHTML = "";
+            // Listeyi temizle.
+
             parsed.users.forEach(user => {
+              // Her kullanıcıyı listeye ekle.
               const li = document.createElement("li");
               li.textContent = user;
               list.appendChild(li);
             });
-            return;
+            return; // İşlem bitti, mesaj olarak ekleme.
           }
-        } catch (err) {
-          // Normal mesaj olarak işlemeye devam et
+        } catch (_) {
+          // JSON parse hatası olursa boş geç.
         }
 
+        // Normal bir sohbet mesajıysa:
         const chatList = document.getElementById("chat");
-        if (!chatList) return;
         const li = document.createElement("li");
         li.textContent = event.data;
         chatList.appendChild(li);
       };
-
-      socket.onerror = function (error) {
-        console.log("Socket hatası:", error);
-      };
-
-      socket.onclose = function (event) {
-        console.log("Bağlantı kapatıldı. Kodu:", event.code);
-      };
     }
 
     function sendMessage(e) {
+      // Mesaj gönderme fonksiyonu.
       if (e) e.preventDefault();
+      // Enter ile gelirse varsayılan submit olayını engelle.
 
-      const username = document.getElementById("username").value.trim();
       const msg = document.getElementById("message").value.trim();
+      // Mesaj inputundan metni al.
 
-      if (!username) {
-        alert("Lütfen kullanıcı adınızı girin.");
-        return;
-      }
+      if (!msg) return;
+      // Boş mesaj göndermeye çalışma.
 
-      if (!socket || socket.readyState === WebSocket.CLOSED) {
-        openSocket(username);
-        console.log("Bağlantı yoktu, açıldı.");
-        setTimeout(() => {
-          if (msg) {
-            socket.send(msg);
-            document.getElementById("message").value = "";
-          }
-        }, 200);
-        return;
-      }
-
-      if (!msg) {
-        console.log("Mesaj yok.");
-        return;
-      }
-
-      if (socket.readyState === WebSocket.OPEN) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        // Bağlantı açık ise mesajı gönder.
         socket.send(msg);
         document.getElementById("message").value = "";
-      } else {
-        console.log("Socket henüz açık değil. Kısa süre bekleniyor...");
-        setTimeout(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(msg);
-            document.getElementById("message").value = "";
-          }
-        }, 200);
+        // Mesaj kutusunu temizle.
       }
     }
 
-    document.getElementById("message").addEventListener("keydown", function (e) {
+    document.getElementById("message").addEventListener("keydown", e => {
+      // Mesaj kutusunda Enter tuşuna basıldığında:
       if (e.key === "Enter") sendMessage(e);
     });
   </script>
+
 </body>
 </html>
